@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  {{> head}}
+</head>
+
+<body class="bg-gray-900 text-white">
+  <div class="w-full flex justify-center p-4">
+    <h2 class="text-3xl">Quickly Get Racket Followers Here!</h2>
+  </div>
+
+  {{!-- start of SPA --}}
+  <div x-init="init()"
+    x-data="{ racketFollowUrl: '', tweetSearch: 'racket app', tweets: [], isLoggedIn: {{isLoggedIn}}, ...pageContainer() }">
+    {{!-- User Login - will show when user is not logged in --}}
+    <div x-show="!isLoggedIn" class="flex items-center justify-center w-full">
+      <a class="bg-green-500 p-4 text-center rounded text-lg" href="/connect/twitter">Login With Twitter To Get
+        Started</a>
+    </div>
+
+    {{!-- User is already logged in --}}
+    <div x-show="isLoggedIn" class="flex flex-col justify-center w-full">
+      {{!-- prefilled tweet searches --}}
+      {{!-- <div class="flex flex-col">
+        <h2 class="text-lg p-4">Try These Searches to Find More Tweets</h2>
+        <div class="flex justify-between">
+          <button class="bg-green-500 p-4 text-center rounded text-md">Racket App</button>
+          <button class="bg-green-500 p-4 text-center rounded text-md">Racket App Follow</button>
+          <button class="bg-green-500 p-4 text-center rounded text-md">Racket App Signup</button>
+          <button class="bg-green-500 p-4 text-center rounded text-md">Racket Followers</button>
+        </div>
+      </div> --}}
+      <div class="flex flex-col items-center">
+        <label class="mt-10" for="tweet-search">Tweet Search</label>
+        <input name="tweet-search" class="mt-10 p-4 text-lg text-gray-900 w-1/2" type="text" x-model="tweetSearch" />
+        <label class="mt-10" for="racket-url">Your Racket Follow Url</label>
+        <input type="text" x-on:change="cacheFollowUrl(racketFollowUrl)" x-model="racketFollowUrl"
+          class="p-4 text-lg text-gray-900 w-1/2 mt-10">
+        <button x-on:click="fetchTweets()" class="bg-green-500 p-4 text-center rounded text-md w-1/2 mt-10">
+          Find People
+        </button>
+      </div>
+
+      {{!-- tweet rendering --}}
+      <div class="flex flex-col m-10">
+        <template x-for="(tweet, index) in tweets" :key="index">
+          <div class="flex w-full mt-10 justify-between">
+            {{!-- tweet user --}}
+            <div class="flex flex-col">
+              <p x-text="tweet.author.username"></p>
+              <img class="w-20 h-20 border border-green-500 rounded-full" x-bind:src="tweet.author.profile_image_url"
+                alt="user profile">
+            </div>
+            {{!-- tweet text --}}
+            <div class="flex bg-blue-700 w-1/2 rounded p-2">
+              <p x-text="tweet.text" class="text-lg"></p>
+            </div>
+            {{!-- tweet actions --}}
+            <div class="flex flex-col">
+              <a class="bg-green-500 p-4 mb-10 rounded"
+                x-bind:href="'https://twitter.com/racket100/status/' + tweet.id">See
+                Full
+                Tweet</a>
+              <button x-on:click="askForFollow(tweet, racketFollowUrl)" class="bg-green-500 p-4 mb-10 rounded">Ask For
+                Racket
+                Follow</button>
+            </div>
+          </div>
+        </template>
+      </div>
+
+    </div>
+    {{!-- end of logged in app --}}
+
+  </div>
+
+  <script>
+    function csrfHeader() {
+      return { 'x-xsrf-token': document.querySelector('input[name="csrf"]').value }
+    }
+
+    function pageContainer() {
+      return {
+        init() {
+          const followUrl = localStorage.getItem('racketFollowUrl');
+
+          if (followUrl) {
+            this.racketFollowUrl = followUrl;
+          }
+        },
+        cacheFollowUrl(url) {
+          localStorage.setItem('racketFollowUrl', url);
+        },
+        async fetchTweets() {
+          const tweets = await fetch(`/tweets?query=${this.tweetSearch}`, { headers: csrfHeader() })
+            .then(isOk)
+            .then(json)
+            .catch(logError);
+
+          this.tweets = tweets;
+        },
+        async askForFollow(tweet, followUrl) {
+          if (!this.racketFollowUrl) {
+            alert('You must enter a follow url - otherwise people will not know where to follow you!')
+          }
+
+          await fetch('/tweet', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', ...csrfHeader() },
+            body: JSON.stringify({
+              status: `Hey @${tweet.author.username} - I'm looking to join up as well.  Follow for follow? ${followUrl}`,
+              reply_to_status_id: tweet.id
+            })
+          }).then(isOk).then(json).then(console.log).catch(logError);
+        }
+      }
+    }
+
+    function json(res) {
+      return res.json()
+    }
+
+    function logError(errorMessage) {
+      return function (res) {
+        console.error(res);
+        console.error(errorMessage);
+      }
+    }
+
+    function isOk(res) {
+      if (!res.ok) {
+        throw res;
+      }
+
+      return res;
+    }
+  </script>
+</body>
+
+</html>
